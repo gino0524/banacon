@@ -228,13 +228,32 @@ CRON_SECRET         = <임박 알림 cron 보호용>      # route handler 인증
 | P4 | 캘린더 월 뷰 | ✅ 완료 (2026-06-29) |
 | P5 | 댓글 + 폴링(댓글·참석 라이브) | ✅ 완료 (2026-06-29) |
 | P6 | 알림: new_event fan-out + 피드 + 배지 | ✅ 완료 (2026-06-29) |
-| P7 | 임박 알림 cron (event_soon) | ⬜ 미완료 |
+| P7 | 임박 알림 cron (event_soon) | ✅ 완료 (2026-06-29) |
 | P8 | PWA + 반응형 마감 + 배포 준비 | ⬜ 미완료 |
 
 상태 값: `⬜ 미완료` / `🔄 진행중` / `✅ 완료`. 완료 시 날짜를 함께 적는다(예: `✅ 완료 (2026-07-01)`).
 
 ### 📌 세션 인계 메모 (마지막 갱신 2026-06-29)
-**다음 작업: P7 (임박 알림 cron event_soon).**
+**다음 작업: P8 (PWA + 반응형 마감 + 배포 준비).**
+
+P7에서 만들어진 것 (이미 존재, 다시 만들지 말 것):
+- `src/app/api/cron/event-soon/route.ts` — **임박 알림 cron 엔드포인트**(GET, `force-dynamic`).
+  Vercel cron이 보내는 `Authorization: Bearer ${CRON_SECRET}` 헤더로 직접 인증(proxy가 `/api` 제외 →
+  미인증/시크릿 불일치 401). 지금~24h 내 시작 이벤트를 attendances와 join, 상태 `going`/`maybe`만 대상
+  (불참·미응답 제외). `notifications`에 type=`event_soon`·eventId·`payload={title}` 일괄 insert를
+  **`.onConflictDoNothing()`** 으로 수행 → partial unique index(`user_id,event_id,type`)가 중복 차단(idempotent).
+  반환 `{ inserted, candidates }`(insert는 returning 행 수로 카운트).
+- `vercel.json` — `crons`에 `/api/cron/event-soon`를 **매시간**(`"0 * * * *"`) 호출 등록.
+  ⚠️ Vercel은 cron 호출 시 `CRON_SECRET` 환경변수가 있으면 자동으로 Authorization 헤더에 실어준다(배포 시 env 설정 필요).
+- 검증 완료: `tsc --noEmit` OK, `npm run build` OK(`/api/cron/event-soon` = ƒ 동적, Proxy 활성).
+  런타임(dev 3970): 헤더 없이→401. 12h 뒤 시작 이벤트 + going/maybe/not_going 3명 세팅 후
+  **cron 두 번 호출 → 1회차 inserted 2(going+maybe), 2회차 inserted 0**(중복 차단, AC 7).
+  DB 확인: 해당 이벤트 event_soon 정확히 2건, **일정 삭제 시 알림 CASCADE 0**·users 14 보존. 검증 데이터는 사후 삭제함.
+- ⚠️ PWA(manifest/아이콘)·탭바 "나" 탭·반응형 최종 마감·README/배포 절차는 P8.
+
+---
+
+**이전 작업: P7 (임박 알림 cron event_soon).**
 
 P6에서 만들어진 것 (이미 존재, 다시 만들지 말 것):
 - `src/app/actions.ts` `createEvent`에 **new_event fan-out** 추가 — 이벤트 insert 직후
