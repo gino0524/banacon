@@ -119,6 +119,29 @@ export async function setAttendance(
   revalidatePath(`/events/${eventId}`);
 }
 
+// F3: 댓글 작성. 작성자는 쿠키의 user_id(서버 권위). 본문 1~1000자.
+export type CommentFormState = { error?: string };
+export async function addComment(
+  eventId: string,
+  body: string,
+): Promise<CommentFormState> {
+  const session = await getSession();
+  if (!session) redirect("/login");
+
+  const trimmed = body.trim();
+  if (!trimmed) return { error: "댓글을 입력해주세요." };
+  if (trimmed.length > 1000) {
+    return { error: "댓글은 1000자 이하여야 합니다." };
+  }
+
+  await db
+    .insert(schema.comments)
+    .values({ eventId, userId: session.uid, body: trimmed });
+
+  revalidatePath(`/events/${eventId}`);
+  return {};
+}
+
 // 3·5장: 일정 삭제는 생성자 본인만. 참석/댓글/알림은 FK CASCADE로 함께 삭제.
 export async function deleteEvent(eventId: string): Promise<void> {
   const session = await getSession();

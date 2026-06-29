@@ -226,7 +226,7 @@ CRON_SECRET         = <임박 알림 cron 보호용>      # route handler 인증
 | P2 | 로그인/세션 + 미들웨어 게이트 | ✅ 완료 (2026-06-29) |
 | P3 | 이벤트 생성/목록/상세 + 참석 토글·명단 | ✅ 완료 (2026-06-29) |
 | P4 | 캘린더 월 뷰 | ✅ 완료 (2026-06-29) |
-| P5 | 댓글 + 폴링(댓글·참석 라이브) | ⬜ 미완료 |
+| P5 | 댓글 + 폴링(댓글·참석 라이브) | ✅ 완료 (2026-06-29) |
 | P6 | 알림: new_event fan-out + 피드 + 배지 | ⬜ 미완료 |
 | P7 | 임박 알림 cron (event_soon) | ⬜ 미완료 |
 | P8 | PWA + 반응형 마감 + 배포 준비 | ⬜ 미완료 |
@@ -234,7 +234,31 @@ CRON_SECRET         = <임박 알림 cron 보호용>      # route handler 인증
 상태 값: `⬜ 미완료` / `🔄 진행중` / `✅ 완료`. 완료 시 날짜를 함께 적는다(예: `✅ 완료 (2026-07-01)`).
 
 ### 📌 세션 인계 메모 (마지막 갱신 2026-06-29)
-**다음 작업: P5 (댓글 + 폴링).**
+**다음 작업: P6 (알림: new_event fan-out + 피드 + 배지).**
+
+P5에서 만들어진 것 (이미 존재, 다시 만들지 말 것):
+- `src/app/actions.ts`에 `addComment(eventId, body)` 추가 — `CommentFormState={error?}` 반환.
+  쿠키 user_id(서버 권위)로 작성, **본문 trim 후 1~1000자** 검증, `revalidatePath`. ⚠️ `new_comment`
+  알림은 MVP 제외(만들지 말 것).
+- `src/app/events/[id]/types.ts` — 폴링 데이터 공유 형태 `EventLiveData`(myStatus/roster{going,
+  maybe,notGoing,noResponse}/comments[{id,body,authorName,avatarColor,createdAt(ISO)}]).
+- `src/app/events/[id]/data.ts` — `loadEventLive(eventId, uid)` 서버 로더(`import "server-only"`).
+  명단(참석자 join + 전체 users로 미응답 계산) + 댓글(작성순 asc, 작성자명 join, createdAt ISO).
+  **page 초기 렌더와 폴링 route가 공유**(형태 불일치 방지).
+- `src/app/api/events/[id]/route.ts` — **SWR 폴링 엔드포인트**(GET). `export const dynamic="force-dynamic"`.
+  proxy matcher가 `/api` 제외하므로 **여기서 `getSession()`으로 직접 인증**(미로그인→401). 본문은 `loadEventLive`.
+- `src/app/events/[id]/EventLive.tsx`(client) — **SWR `refreshInterval` 4초 폴링**(`/api/events/[id]`,
+  서버 초기값을 `fallbackData`로). 참석 토글(`setAttendance`→`mutate()`)·참석 명단·댓글 목록·댓글 폼
+  (`addComment`, maxLength 1000+카운터, 빈값/에러 표시)을 모두 포함. 댓글 시간은 KST(`Intl` Asia/Seoul).
+- `src/app/events/[id]/page.tsx` — 정적 헤더/설명/삭제(생성자)는 유지, **명단·토글·댓글은 EventLive로 이동**.
+  초기값은 `loadEventLive`로 조회해 `initial` prop 전달.
+- ⚠️ 기존 `AttendanceToggle.tsx`는 **삭제됨**(토글이 EventLive에 통합). 다시 만들지 말 것.
+- 검증 완료: `tsc --noEmit` OK, `npm run build` OK(`/api/events/[id]`·`/events/[id]` = ƒ 동적, Proxy 활성).
+  데이터 경로(임시 tsx, 사후 삭제): 미응답 14→참석 upsert 후 13·going 반영·myStatus,
+  댓글 2건 작성순·작성자명·ISO, **1001자 DB 거부·1000자 허용**, 삭제 시 댓글/참석 CASCADE·users 14 보존.
+  런타임(dev 3955): `/api/events/[id]` 쿠키 없이→401, 유효 세션 쿠키→200 JSON(roster·comments·myStatus).
+  검증용 이벤트는 사후 삭제함.
+- ⚠️ 하단 탭바/네비게이션·알림은 여전히 없음(P6 피드·배지, P8 최종).
 
 P4에서 만들어진 것 (이미 존재, 다시 만들지 말 것):
 - `src/app/calendar/page.tsx`(server) — 전체 이벤트 조회(`startAt asc`), **KST로 날짜키

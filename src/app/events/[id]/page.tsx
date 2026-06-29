@@ -1,9 +1,9 @@
 import { notFound } from "next/navigation";
-import { asc, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { getSession } from "@/lib/session";
-import type { AttendanceStatusValue } from "@/app/actions";
-import AttendanceToggle from "./AttendanceToggle";
+import { loadEventLive } from "./data";
+import EventLive from "./EventLive";
 import DeleteEventButton from "./DeleteEventButton";
 
 // 10장: 저장은 UTC, 표시는 KST 고정.
@@ -17,45 +17,6 @@ function fmtKst(d: Date): string {
     hour: "2-digit",
     minute: "2-digit",
   }).format(d);
-}
-
-type RosterUser = { name: string; avatarColor: string | null };
-
-function NameChip({ user }: { user: RosterUser }) {
-  return (
-    <span className="inline-flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-2.5 py-1 text-sm">
-      <span
-        className="h-2.5 w-2.5 shrink-0 rounded-full"
-        style={{ backgroundColor: user.avatarColor ?? "#a1a1aa" }}
-      />
-      {user.name}
-    </span>
-  );
-}
-
-function RosterSection({
-  label,
-  users,
-}: {
-  label: string;
-  users: RosterUser[];
-}) {
-  return (
-    <div className="flex flex-col gap-2">
-      <h3 className="text-sm font-medium text-zinc-600">
-        {label} {users.length}
-      </h3>
-      {users.length > 0 ? (
-        <div className="flex flex-wrap gap-1.5">
-          {users.map((u) => (
-            <NameChip key={u.name} user={u} />
-          ))}
-        </div>
-      ) : (
-        <p className="text-sm text-zinc-400">없음</p>
-      )}
-    </div>
-  );
 }
 
 export default async function EventPage({
@@ -84,35 +45,8 @@ export default async function EventPage({
 
   if (!event) notFound();
 
-  // 참석 응답자 + 전체 사용자(미응답 계산용, F1: 14 − 응답자).
-  const roster = await db
-    .select({
-      userId: schema.attendances.userId,
-      status: schema.attendances.status,
-      name: schema.users.name,
-      avatarColor: schema.users.avatarColor,
-    })
-    .from(schema.attendances)
-    .innerJoin(schema.users, eq(schema.users.id, schema.attendances.userId))
-    .where(eq(schema.attendances.eventId, id));
-
-  const allUsers = await db
-    .select({
-      id: schema.users.id,
-      name: schema.users.name,
-      avatarColor: schema.users.avatarColor,
-    })
-    .from(schema.users)
-    .orderBy(asc(schema.users.name));
-
-  const going = roster.filter((r) => r.status === "going");
-  const maybe = roster.filter((r) => r.status === "maybe");
-  const notGoing = roster.filter((r) => r.status === "not_going");
-  const respondedIds = new Set(roster.map((r) => r.userId));
-  const noResponse = allUsers.filter((u) => !respondedIds.has(u.id));
-
-  const myStatus: AttendanceStatusValue | null =
-    roster.find((r) => r.userId === session?.uid)?.status ?? null;
+  // 참석 명단 + 댓글(라이브 영역)의 초기값. 이후 EventLive가 SWR로 폴링 갱신한다.
+  const initial = await loadEventLive(event.id, session?.uid);
   const isCreator = session?.uid === event.creatorId;
 
   return (
@@ -140,18 +74,7 @@ export default async function EventPage({
         </p>
       )}
 
-      <section className="mt-8 flex flex-col gap-3">
-        <h2 className="text-sm font-semibold">내 참석 상태</h2>
-        <AttendanceToggle eventId={event.id} current={myStatus} />
-      </section>
-
-      <section className="mt-8 flex flex-col gap-5">
-        <h2 className="text-sm font-semibold">참석 명단</h2>
-        <RosterSection label="가는중" users={going} />
-        <RosterSection label="미정" users={maybe} />
-        <RosterSection label="불참" users={notGoing} />
-        <RosterSection label="미응답" users={noResponse} />
-      </section>
+      <EventLive eventId={event.id} initial={initial} />
 
       {isCreator && (
         <section className="mt-10 border-t border-zinc-200 pt-6">
