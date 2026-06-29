@@ -223,7 +223,7 @@ CRON_SECRET         = <임박 알림 cron 보호용>      # route handler 인증
 |---|---|---|
 | P0 | 프로젝트 셋업 (스캐폴드 + 의존성 + DB 연결) | ✅ 완료 (2026-06-29) |
 | P1 | DB 스키마 + 14명 시드 | ✅ 완료 (2026-06-29) |
-| P2 | 로그인/세션 + 미들웨어 게이트 | ⬜ 미완료 |
+| P2 | 로그인/세션 + 미들웨어 게이트 | ✅ 완료 (2026-06-29) |
 | P3 | 이벤트 생성/목록/상세 + 참석 토글·명단 | ⬜ 미완료 |
 | P4 | 캘린더 월 뷰 | ⬜ 미완료 |
 | P5 | 댓글 + 폴링(댓글·참석 라이브) | ⬜ 미완료 |
@@ -234,7 +234,29 @@ CRON_SECRET         = <임박 알림 cron 보호용>      # route handler 인증
 상태 값: `⬜ 미완료` / `🔄 진행중` / `✅ 완료`. 완료 시 날짜를 함께 적는다(예: `✅ 완료 (2026-07-01)`).
 
 ### 📌 세션 인계 메모 (마지막 갱신 2026-06-29)
-**다음 작업: P2 (로그인/세션 + 미들웨어 게이트).**
+**다음 작업: P3 (이벤트 생성/목록/상세 + 참석 토글·명단).**
+
+P2에서 만들어진 것 (이미 존재, 다시 만들지 말 것):
+- `src/lib/session.ts` — jose 서명 쿠키. `createSession(userId)`/`getSession()`/
+  `verifySessionToken(token)`. 쿠키명 `session`, `httpOnly + sameSite=lax +
+  secure(prod) + maxAge 30일`. 페이로드 `{ uid }`. SESSION_SECRET을 HS256 키로 사용.
+  `import "server-only"`(서버 전용). P3 이후 액션에서 `getSession()`으로 user_id 판정.
+- `src/app/actions.ts` — `login(prev, formData)` 서버 액션(`useActionState`용,
+  `LoginState = { error?: string }`). APP_INVITE_CODE 서버 검증 + userId가 DB users에
+  실재하는지 검증 후 `createSession` → `redirect('/calendar')`. **P3~는 이 파일에
+  createEvent/setAttendance 등을 추가**(login 옆에).
+- `src/app/login/page.tsx`(server, DB users 14명 조회) + `src/app/login/LoginForm.tsx`
+  (client, 초대코드 password 입력 + 3열 이름 그리드, 선택 user.id를 hidden으로 전송).
+- `src/proxy.ts` — **미들웨어 게이트**. ⚠️ Next 16에서 `middleware.ts`가 deprecated →
+  `proxy.ts` + `export function proxy`로 작성함(동작 동일). Edge에서 `request.cookies`로
+  쿠키 읽고 jose 검증만(DB 미접근). `/`→로그인 시 /calendar·아니면 /login, 보호 라우트
+  미로그인→/login, 로그인 상태 /login→/calendar. matcher가 api·정적자산·`.`포함 경로 제외.
+- 검증 완료: `tsc --noEmit` OK, `npm run build` OK(경고 없음, Proxy 활성).
+  런타임(dev 3939) 확인 — 미로그인 /calendar·/ → 307 /login, /login 200(14명 노출),
+  유효 쿠키 /calendar 게이트 통과(404=P4 미존재), 로그인 상태 /login·/ → 307 /calendar,
+  변조 쿠키 → 307 /login(서명 거부).
+- ⚠️ `/calendar`·`/events`·`/notifications` 페이지는 아직 없음(후속 Phase). 로그인 후
+  /calendar 랜딩은 P4까지 404. 정상.
 
 P0에서 만들어진 것 (이미 존재, 다시 만들지 말 것):
 - Next.js 16 + React 19 + TS + Tailwind v4 스캐폴드 (App Router, `src/`, `@/*`).
