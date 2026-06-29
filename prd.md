@@ -225,7 +225,7 @@ CRON_SECRET         = <임박 알림 cron 보호용>      # route handler 인증
 | P1 | DB 스키마 + 14명 시드 | ✅ 완료 (2026-06-29) |
 | P2 | 로그인/세션 + 미들웨어 게이트 | ✅ 완료 (2026-06-29) |
 | P3 | 이벤트 생성/목록/상세 + 참석 토글·명단 | ✅ 완료 (2026-06-29) |
-| P4 | 캘린더 월 뷰 | ⬜ 미완료 |
+| P4 | 캘린더 월 뷰 | ✅ 완료 (2026-06-29) |
 | P5 | 댓글 + 폴링(댓글·참석 라이브) | ⬜ 미완료 |
 | P6 | 알림: new_event fan-out + 피드 + 배지 | ⬜ 미완료 |
 | P7 | 임박 알림 cron (event_soon) | ⬜ 미완료 |
@@ -234,7 +234,22 @@ CRON_SECRET         = <임박 알림 cron 보호용>      # route handler 인증
 상태 값: `⬜ 미완료` / `🔄 진행중` / `✅ 완료`. 완료 시 날짜를 함께 적는다(예: `✅ 완료 (2026-07-01)`).
 
 ### 📌 세션 인계 메모 (마지막 갱신 2026-06-29)
-**다음 작업: P4 (캘린더 월 뷰).**
+**다음 작업: P5 (댓글 + 폴링).**
+
+P4에서 만들어진 것 (이미 존재, 다시 만들지 말 것):
+- `src/app/calendar/page.tsx`(server) — 전체 이벤트 조회(`startAt asc`), **KST로 날짜키
+  (`en-CA` → "YYYY-MM-DD")·시간 라벨 미리 계산**해 클라이언트로 전달(클라 로컬 타임존 비의존).
+  `export const dynamic = "force-dynamic"`로 **빌드 박제 방지**(createEvent의 /calendar redirect가
+  최신 데이터 보이게). `todayKey`도 KST로 계산해 전달.
+- `src/app/calendar/CalendarClient.tsx`(client) — date-fns로 6주 그리드(`startOfWeek~endOfWeek`,
+  일요일 시작). 날짜키 매칭으로 이벤트 점(badge) 표시, 날짜 클릭 시 그날 목록, **모바일 아젠다(목록)
+  토글**(`목록`↔`달력`, sm:hidden). 셀은 `format(d,"yyyy-MM-dd")` 키로 서버 KST 버킷과 매칭.
+  선택 기본값=오늘. 이벤트 행은 `/events/[id]` 링크.
+- ⚠️ 폴링(SWR) 아직 없음 — 캘린더는 force-dynamic 요청마다 갱신. 라이브 폴링은 P5.
+- ⚠️ 하단 탭바/네비게이션은 아직 없음(P6 배지·P8 최종). 캘린더에서 새 일정 만들기 버튼도 아직 없음.
+- 검증 완료: `tsc --noEmit` OK, `npm run build` OK(/calendar = ƒ 동적 전환 확인).
+  런타임(dev 3941): 미로그인 /calendar→307 /login, 유효 쿠키→200, 요일헤더·월라벨·아젠다토글·
+  이벤트 제목(오늘 칸 버킷)·이벤트 링크 렌더 확인. 검증용 테스트 이벤트는 사후 삭제함.
 
 P3에서 만들어진 것 (이미 존재, 다시 만들지 말 것):
 - `src/app/actions.ts`에 액션 3개 추가(login 옆):
