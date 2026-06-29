@@ -230,11 +230,27 @@ CRON_SECRET         = <임박 알림 cron 보호용>      # route handler 인증
 | P6 | 알림: new_event fan-out + 피드 + 배지 | ✅ 완료 (2026-06-29) |
 | P7 | 임박 알림 cron (event_soon) | ✅ 완료 (2026-06-29) |
 | P8 | PWA + 반응형 마감 + 배포 준비 | ✅ 완료 (2026-06-29) |
+| AC | 12장 수용 기준(AC 1~10) E2E 최종 통과 | ✅ 완료 (2026-06-29) |
 
 상태 값: `⬜ 미완료` / `🔄 진행중` / `✅ 완료`. 완료 시 날짜를 함께 적는다(예: `✅ 완료 (2026-07-01)`).
 
+**🎉 전 Phase(P0~P8) + AC 1~10 E2E 완료. 남은 일은 실제 Vercel 배포뿐(사용자 작업, README 절차 참고).**
+
 ### 📌 세션 인계 메모 (마지막 갱신 2026-06-29)
-**모든 Phase(P0~P8) 완료. 남은 일은 12장 수용 기준(AC 1~10) 최종 E2E + 실제 Vercel 배포(사용자 작업).**
+**모든 Phase(P0~P8) + AC 1~10 E2E 완료. 남은 일은 실제 Vercel 배포(사용자 작업)뿐.**
+
+AC 1~10 E2E 검증 완료 (2026-06-29) — 전부 통과:
+- 실제 dev 서버 HTTP + 실제 서버 액션 + DB 불변식으로 점검.
+- AC1 미로그인 보호 라우트 5개 전부 307→/login · AC2 로그인(잘못된 코드/없는 사용자 거부, 성공 시
+  /calendar 리다이렉트 + 쿠키 HttpOnly·SameSite=Lax·Path=/) · AC3 fan-out 13건(생성자 0)·B 캘린더/피드/배지 1 ·
+  AC4 참석 업서트(행 1개·going→maybe 갱신) · AC5 미응답 14→13 정확 · AC6 댓글 양쪽 표시·1001자 거부/1000자 허용/빈값 거부 ·
+  AC7 cron 2회 inserted 2→0(중복 차단)·not_going 제외·무인증/오시크릿 401 · AC8 비생성자 삭제 거부·생성자 삭제 cascade·
+  다른 일정 무영향·users 14 보존 · AC9 manifest standalone·아이콘 3종 200·메타·탭바 4탭·max-w-md · AC10 프로덕션
+  클라이언트 번들(.next/static 20파일) 시크릿 4종 전부 미노출.
+- ⚠️ 검증 방식: `useActionState` 액션(login·createEvent)은 React wire 포맷 재현이 까다로워 **실제 액션을
+  실제 요청 컨텍스트에서 호출하는 임시 라우트 `/api/e2etest`** 를 두고 점검 후 **삭제함**(커밋 안 함, 다시 만들지 말 것).
+  programmatic 액션·라우팅·cron·번들은 직접 HTTP로 검증. 테스트 이벤트/알림은 사후 삭제 →
+  **DB 최종: users 14, events/attendances/comments/notifications 전부 0**.
 
 P8에서 만들어진 것 (이미 존재, 다시 만들지 말 것):
 - **PWA**: `public/manifest.json`(name/short_name=banacon, start_url=`/calendar`,
