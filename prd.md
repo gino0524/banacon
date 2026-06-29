@@ -224,7 +224,7 @@ CRON_SECRET         = <임박 알림 cron 보호용>      # route handler 인증
 | P0 | 프로젝트 셋업 (스캐폴드 + 의존성 + DB 연결) | ✅ 완료 (2026-06-29) |
 | P1 | DB 스키마 + 14명 시드 | ✅ 완료 (2026-06-29) |
 | P2 | 로그인/세션 + 미들웨어 게이트 | ✅ 완료 (2026-06-29) |
-| P3 | 이벤트 생성/목록/상세 + 참석 토글·명단 | ⬜ 미완료 |
+| P3 | 이벤트 생성/목록/상세 + 참석 토글·명단 | ✅ 완료 (2026-06-29) |
 | P4 | 캘린더 월 뷰 | ⬜ 미완료 |
 | P5 | 댓글 + 폴링(댓글·참석 라이브) | ⬜ 미완료 |
 | P6 | 알림: new_event fan-out + 피드 + 배지 | ⬜ 미완료 |
@@ -234,7 +234,27 @@ CRON_SECRET         = <임박 알림 cron 보호용>      # route handler 인증
 상태 값: `⬜ 미완료` / `🔄 진행중` / `✅ 완료`. 완료 시 날짜를 함께 적는다(예: `✅ 완료 (2026-07-01)`).
 
 ### 📌 세션 인계 메모 (마지막 갱신 2026-06-29)
-**다음 작업: P3 (이벤트 생성/목록/상세 + 참석 토글·명단).**
+**다음 작업: P4 (캘린더 월 뷰).**
+
+P3에서 만들어진 것 (이미 존재, 다시 만들지 말 것):
+- `src/app/actions.ts`에 액션 3개 추가(login 옆):
+  - `createEvent(prev, formData)` — `EventFormState={error?}`, `useActionState`용. 쿠키 user_id를
+    creator로. title(필수·≤80)·startAt(필수) 검증. **KST 입력→UTC 저장**(`kstLocalToUtc`:
+    datetime-local "YYYY-MM-DDTHH:mm"에 `+09:00` 고정 부착). 성공 시 `/events/[id]`로 redirect.
+    ⚠️ **new_event 알림 fan-out은 여기 없음 — P6에서 createEvent에 추가**.
+  - `setAttendance(eventId, status)` — UNIQUE(event_id,user_id) `onConflictDoUpdate` upsert,
+    `revalidatePath`. status는 'going'|'not_going'|'maybe'(`AttendanceStatusValue` export).
+  - `deleteEvent(eventId)` — 생성자(쿠키 uid===creatorId) 검증 후 delete, cascade. 성공 시 `/calendar` redirect.
+- `src/app/events/new/page.tsx`(server) + `NewEventForm.tsx`(client, useActionState).
+- `src/app/events/[id]/page.tsx`(server: 이벤트+명단 조회, 미응답=전체−응답자 화면 계산,
+  KST 표시는 `Intl.DateTimeFormat timeZone:'Asia/Seoul'`) + `AttendanceToggle.tsx`(client,
+  useTransition+router.refresh) + `DeleteEventButton.tsx`(client, confirm 후 삭제, 생성자만 노출).
+- 검증 완료: `tsc --noEmit` OK, `npm run build` OK(`/events/new` 정적·`/events/[id]` 동적·Proxy 활성).
+  DB 불변식 직접 검증(임시 스크립트) — KST→UTC(19:00KST=10:00Z), 참석 재토글 행 1개·상태 갱신,
+  미응답 14−응답자, 일정 삭제 시 att/com/noti CASCADE·users 14명 보존(AC 4·5·8).
+- ⚠️ `/calendar` 라우트는 아직 없음(P4). createEvent/deleteEvent의 `/calendar` redirect는
+  P4 전까지 404로 떨어짐(정상). 이벤트 상세는 redirect URL을 직접 열어 확인 가능.
+- ⚠️ 폴링(SWR) 미적용 — 참석/명단은 router.refresh로 갱신. 라이브 폴링은 P5.
 
 P2에서 만들어진 것 (이미 존재, 다시 만들지 말 것):
 - `src/lib/session.ts` — jose 서명 쿠키. `createSession(userId)`/`getSession()`/
