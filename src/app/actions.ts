@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { eq } from "drizzle-orm";
+import { and, eq, isNull, ne } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
 import { createSession, getSession } from "@/lib/session";
 
@@ -93,6 +93,23 @@ export async function createEvent(
     })
     .returning({ id: schema.events.id });
 
+  // P6 / F4: 새 일정 fan-out — 생성자 제외 나머지에게 new_event 알림 1건씩.
+  // payload에 제목 스냅샷을 남겨, 일정 삭제(cascade) 전까지 피드에서 표시한다.
+  const others = await db
+    .select({ id: schema.users.id })
+    .from(schema.users)
+    .where(ne(schema.users.id, session.uid));
+  if (others.length > 0) {
+    await db.insert(schema.notifications).values(
+      others.map((u) => ({
+        userId: u.id,
+        type: "new_event" as const,
+        eventId: created.id,
+        payload: { title },
+      })),
+    );
+  }
+
   redirect(`/events/${created.id}`);
 }
 
@@ -158,4 +175,20 @@ export async function deleteEvent(eventId: string): Promise<void> {
 
   await db.delete(schema.events).where(eq(schema.events.id, eventId));
   redirect("/calendar");
+}
+
+// F4: 알림 확인 시 read 처리. 쿠키 user_id의 안읽음 알림에만 read_at을 찍는다.
+export async function markNotificationsRead(): Promise<void> {
+  const session = await getSession();
+  if (!session) redirect("/login");
+
+  await db
+    .update(schema.notifications)
+    .set({ readAt: new Date() })
+    .where(
+      and(
+        eq(schema.notifications.userId, session.uid),
+        isNull(schema.notifications.readAt),
+      ),
+    );
 }

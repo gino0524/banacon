@@ -227,14 +227,40 @@ CRON_SECRET         = <임박 알림 cron 보호용>      # route handler 인증
 | P3 | 이벤트 생성/목록/상세 + 참석 토글·명단 | ✅ 완료 (2026-06-29) |
 | P4 | 캘린더 월 뷰 | ✅ 완료 (2026-06-29) |
 | P5 | 댓글 + 폴링(댓글·참석 라이브) | ✅ 완료 (2026-06-29) |
-| P6 | 알림: new_event fan-out + 피드 + 배지 | ⬜ 미완료 |
+| P6 | 알림: new_event fan-out + 피드 + 배지 | ✅ 완료 (2026-06-29) |
 | P7 | 임박 알림 cron (event_soon) | ⬜ 미완료 |
 | P8 | PWA + 반응형 마감 + 배포 준비 | ⬜ 미완료 |
 
 상태 값: `⬜ 미완료` / `🔄 진행중` / `✅ 완료`. 완료 시 날짜를 함께 적는다(예: `✅ 완료 (2026-07-01)`).
 
 ### 📌 세션 인계 메모 (마지막 갱신 2026-06-29)
-**다음 작업: P6 (알림: new_event fan-out + 피드 + 배지).**
+**다음 작업: P7 (임박 알림 cron event_soon).**
+
+P6에서 만들어진 것 (이미 존재, 다시 만들지 말 것):
+- `src/app/actions.ts` `createEvent`에 **new_event fan-out** 추가 — 이벤트 insert 직후
+  생성자 제외 나머지(`ne(users.id, uid)`)에게 `notifications` 일괄 insert(type=`new_event`,
+  eventId 연결, `payload={title}` 제목 스냅샷). redirect 전에 수행. ⚠️ `new_comment`는 MVP 제외(만들지 말 것).
+- `src/app/actions.ts`에 **`markNotificationsRead()`** 추가 — 쿠키 user_id의 `readAt IS NULL`
+  알림에만 `readAt=now` update(서버 권위). 반환 void.
+- `src/app/api/notifications/unread-count/route.ts` — **배지 SWR 폴링 엔드포인트**(GET,
+  `force-dynamic`). proxy가 `/api` 제외 → 여기서 `getSession()` 직접 인증(미로그인 401).
+  `{ unread: number }`(안읽음 `count(*)::int`) 반환.
+- `src/app/notifications/page.tsx`(server, `force-dynamic`) — 내 알림 `createdAt desc` 피드.
+  payload.title 표시, 안읽음 파란 점 강조, type 라벨(new_event=새 일정/event_soon=임박 일정),
+  KST 시간, eventId 있으면 `/events/[id]` 링크. 빈 상태 처리.
+- `src/app/notifications/NotificationsReader.tsx`(client) — 피드 진입 시 `hasUnread`면
+  `markNotificationsRead()` 1회 호출(useEffect). 현재 화면 강조는 서버 렌더 상태라 유지, 배지는 다음 폴링에 비워짐.
+- `src/app/TabBar.tsx`(client) — **하단 탭바 첫 도입**. `sticky bottom-0`, 3탭(캘린더/새 일정/알림).
+  `usePathname`로 active 강조 + `/login`·`/`에서 숨김. 알림 탭에 안읽음 배지(SWR 5초 폴링, 99+ 캡).
+  ⚠️ "나" 탭(로그아웃 등)은 **P8 최종**에서 추가.
+- `src/app/layout.tsx` — `{children}` 뒤에 `<TabBar />` 렌더(body는 flex-col, main flex-1 → 탭바 하단 고정).
+- 검증 완료: `tsc --noEmit` OK, `npm run build` OK(`/notifications`·`/api/notifications/unread-count` = ƒ 동적, Proxy 활성).
+  DB 불변식(임시 tsx, 사후 삭제): 이벤트 생성 fan-out 알림 **정확히 13건**·생성자 본인 0건,
+  수신자 안읽음 1→markRead 후 0, **일정 삭제 시 알림 CASCADE 0**·users 14 보존.
+  런타임(dev 3000): `/api/notifications/unread-count` 쿠키 없이→401.
+- ⚠️ `event_soon` 알림은 아직 없음(P7 cron). 탭바 "나" 탭·반응형 마감은 P8.
+
+
 
 P5에서 만들어진 것 (이미 존재, 다시 만들지 말 것):
 - `src/app/actions.ts`에 `addComment(eventId, body)` 추가 — `CommentFormState={error?}` 반환.
