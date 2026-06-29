@@ -4,8 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import useSWR from "swr";
 
-// 6장 공통 레이아웃: 모바일 하단 탭바. P6에서 알림 안읽음 배지를 추가한다.
-// "나" 탭(로그아웃 등)은 P8 최종에서 마무리한다.
+// 6장 공통 레이아웃: 모바일 하단 탭바(캘린더/새 일정/알림/나) + 알림 안읽음 배지.
 const POLL_MS = 5000;
 
 const fetcher = async (url: string): Promise<{ unread: number }> => {
@@ -18,6 +17,7 @@ const TABS = [
   { href: "/calendar", label: "캘린더" },
   { href: "/events/new", label: "새 일정" },
   { href: "/notifications", label: "알림" },
+  { href: "/me", label: "나" },
 ];
 
 export default function TabBar() {
@@ -31,7 +31,7 @@ export default function TabBar() {
   if (pathname === "/login" || pathname === "/") return null;
 
   return (
-    <nav className="sticky bottom-0 z-10 grid grid-cols-3 border-t border-zinc-200 bg-white">
+    <nav className="sticky bottom-0 z-10 grid grid-cols-4 border-t border-zinc-200 bg-white pb-[env(safe-area-inset-bottom)]">
       {TABS.map((t) => {
         const active =
           pathname === t.href || pathname.startsWith(`${t.href}/`);

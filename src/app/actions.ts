@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { and, eq, isNull, ne } from "drizzle-orm";
 import { db, schema } from "@/lib/db";
-import { createSession, getSession } from "@/lib/session";
+import { clearSession, createSession, getSession } from "@/lib/session";
 
 export type LoginState = { error?: string };
 
@@ -175,6 +175,12 @@ export async function deleteEvent(eventId: string): Promise<void> {
 
   await db.delete(schema.events).where(eq(schema.events.id, eventId));
   redirect("/calendar");
+}
+
+// 6장 "나" 탭: 로그아웃. 세션 쿠키를 지우고 로그인 화면으로 보낸다.
+export async function logout(): Promise<void> {
+  await clearSession();
+  redirect("/login");
 }
 
 // F4: 알림 확인 시 read 처리. 쿠키 user_id의 안읽음 알림에만 read_at을 찍는다.

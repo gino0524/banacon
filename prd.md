@@ -229,12 +229,37 @@ CRON_SECRET         = <임박 알림 cron 보호용>      # route handler 인증
 | P5 | 댓글 + 폴링(댓글·참석 라이브) | ✅ 완료 (2026-06-29) |
 | P6 | 알림: new_event fan-out + 피드 + 배지 | ✅ 완료 (2026-06-29) |
 | P7 | 임박 알림 cron (event_soon) | ✅ 완료 (2026-06-29) |
-| P8 | PWA + 반응형 마감 + 배포 준비 | ⬜ 미완료 |
+| P8 | PWA + 반응형 마감 + 배포 준비 | ✅ 완료 (2026-06-29) |
 
 상태 값: `⬜ 미완료` / `🔄 진행중` / `✅ 완료`. 완료 시 날짜를 함께 적는다(예: `✅ 완료 (2026-07-01)`).
 
 ### 📌 세션 인계 메모 (마지막 갱신 2026-06-29)
-**다음 작업: P8 (PWA + 반응형 마감 + 배포 준비).**
+**모든 Phase(P0~P8) 완료. 남은 일은 12장 수용 기준(AC 1~10) 최종 E2E + 실제 Vercel 배포(사용자 작업).**
+
+P8에서 만들어진 것 (이미 존재, 다시 만들지 말 것):
+- **PWA**: `public/manifest.json`(name/short_name=banacon, start_url=`/calendar`,
+  display=standalone, theme_color `#4338ca`, icons 192·512·maskable-512) +
+  `public/icon-192.png`·`icon-512.png`·`icon-maskable-512.png`·`apple-touch-icon.png`(180,
+  둥근 사각형). 아이콘은 System.Drawing으로 생성(배경 `#4338ca`+흰 "ba"). proxy matcher가
+  `.`포함 경로를 제외하므로 manifest·아이콘은 게이트 없이 서빙(검증: 200).
+- `src/app/layout.tsx` — metadata를 banacon용으로 교체(title/description/manifest/appleWebApp/icons)
+  + `viewport` export(themeColor `#4338ca`, width=device-width, viewportFit="cover").
+  ⚠️ 기존 "Create Next App" 보일러플레이트 메타는 제거됨.
+- **"나" 탭**: `src/lib/session.ts`에 `clearSession()`(쿠키 delete) 추가,
+  `src/app/actions.ts`에 **`logout()`** 서버 액션(clearSession→`redirect('/login')`) 추가.
+  `src/app/me/page.tsx`(server, force-dynamic) — 쿠키 uid로 내 user(name/avatarColor) 조회,
+  아바타+이름 표시, `<form action={logout}>` 로그아웃 버튼. 미로그인→`/login`.
+- `src/app/TabBar.tsx` — 탭 4개로 확장(grid-cols-**4**, 캘린더/새 일정/알림/**나**),
+  iOS 홈 인디케이터용 `pb-[env(safe-area-inset-bottom)]` 추가. P6 주석(나 탭 TODO) 정리.
+- `README.md` — 보일러플레이트 교체. 기술 스택·로컬 실행(install→.env.local→db:push/db:seed→dev)·
+  Vercel+Neon 배포 절차(환경변수 4개·cron 자동 Authorization)·구조 메모 작성.
+- 반응형: 기존 페이지가 이미 `mx-auto w-full max-w-md`(+sm:) 모바일 우선이라 추가 변경 없음(safe-area만 보강).
+- 검증 완료: `tsc --noEmit` OK, `npm run build` OK(`/me` = ƒ 동적, Proxy 활성).
+  런타임(dev 3987): `/manifest.json`→200·`/icon-192.png`→200(image/png), 미로그인 `/me`→307 `/login`,
+  유효 세션 쿠키 `/me`→200(아바타·이름·로그아웃 버튼·PWA 메타·탭바 4탭 렌더 확인),
+  **로그아웃 POST(서버 액션)→303 `x-action-redirect=/login` + `Set-Cookie: session=; Expires=1970`(쿠키 삭제)**.
+  검증용 임시 tsx는 사후 삭제함. (테스트 시 .NET HttpClient는 `UseCookies=$false`라야 수동 Cookie 헤더가 전송됨.)
+- ⚠️ Vercel 실제 배포·도메인·환경변수 등록은 사용자 작업(README 참고). 코드/PWA 산출물은 준비 완료.
 
 P7에서 만들어진 것 (이미 존재, 다시 만들지 말 것):
 - `src/app/api/cron/event-soon/route.ts` — **임박 알림 cron 엔드포인트**(GET, `force-dynamic`).

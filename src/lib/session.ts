@@ -53,4 +53,10 @@ export async function getSession(): Promise<{ uid: string } | null> {
   return verifySessionToken(cookieStore.get(COOKIE_NAME)?.value);
 }
 
+// 로그아웃: 세션 쿠키 삭제.
+export async function clearSession(): Promise<void> {
+  const cookieStore = await cookies();
+  cookieStore.delete(COOKIE_NAME);
+}
+
 export { COOKIE_NAME };
